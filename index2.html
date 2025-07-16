@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ambulance Route Optimizer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #e0f7fa 0%, #b0bec5 100%);
+        }
+        #canvas-container {
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            overflow: auto;
+            position: relative;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .modal { display: none; }
+        .modal.show { display: block; }
+        .node-label { font-size: 12px; font-weight: 500; }
+        .toast { transition: all 0.5s ease; }
+        body.dark {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        }
+        body.dark #canvas-container {
+            background: rgba(30, 41, 59, 0.8);
+        }
+        body.dark .glass-card {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: rgba(75, 85, 99, 0.2);
+        }
+        body.dark #output {
+            background: rgba(30, 41, 59, 0.5);
+            color: #f9fafb;
+        }
+        #canvas-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        #canvas-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 4px;
+        }
+        #canvas-container::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+        }
+        #canvas-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body class="min-h-screen p-6">
+    <header class="bg-gradient-to-r from-red-700 to-blue-700 text-white p-6 rounded-xl shadow-lg mb-6 flex justify-between items-center">
+        <div class="flex items-center space-x-4">
+            <lottie-player src="https://assets10.lottiefiles.com/packages/lf20_wgq8q1.json" background="transparent" speed="1" style="width: 60px; height: 60px;" loop autoplay></lottie-player>
+            <h1 class="text-4xl font-bold tracking-wide">Ambulance Route Optimizer</h1>
+        </div>
+        <div class="flex space-x-4">
+            <button id="theme-toggle" class="bg-white text-red-700 px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center space-x-2">
+                <span class="lucide" data-lucide="moon"></span><span>Toggle Theme</span>
+            </button>
+            <button onclick="toggleHelpModal()" class="bg-white text-red-700 px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center space-x-2">
+                <span class="lucide" data-lucide="help-circle"></span><span>Help</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex flex-col lg:flex-row gap-6">
+        <aside class="w-full lg:w-1/3 glass-card p-6 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-semibold mb-6 flex items-center space-x-2 text-gray-800">
+                <span class="lucide" data-lucide="settings"></span><span>Control Dashboard</span>
+            </h2>
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-gray-700">Graph Complexity</label>
+                <select id="graph-complexity" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white/80 text-sm">
+                    <option value="easy">Easy (5 nodes)</option>
+                    <option value="moderate">Moderate (8 nodes)</option>
+                    <option value="complex">Complex (12 nodes)</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-gray-700">Graph Configuration</label>
+                <textarea id="graph-input" class="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y bg-white/80 text-sm" placeholder="V E
+src dest weight road_type
+x y
+..."></textarea>
+                <div class="flex gap-3 mt-3">
+                    <button onclick="loadGraph()" class="w-full bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 transition flex items-center justify-center space-x-2">
+                        <span class="lucide" data-lucide="upload"></span><span>Load Graph</span>
+                    </button>
+                    <button onclick="saveGraph()" class="w-full bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center space-x-2">
+                        <span class="lucide" data-lucide="save"></span><span>Save Graph</span>
+                    </button>
+                </div>
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-gray-700">Source Location</label>
+                <select id="source-node" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white/80 text-sm"></select>
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-gray-700">Destination Location</label>
+                <select id="dest-node" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white/80 text-sm"></select>
+            </div>
+            <div class="mb-6">
+                <label class="block text-sm font-medium mb-2 text-gray-700">Traffic Intensity</label>
+                <input id="traffic-slider" type="range" min="0.5" max="2" step="0.1" value="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                <span id="traffic-value" class="text-sm text-gray-600 ml-2">1.0x</span>
+            </div>
+            <div class="mb-6 flex space-x-3">
+                <button id="rush-hour" class="w-1/2 bg-yellow-600 text-white p-2 rounded-lg hover:bg-yellow-700 transition flex items-center justify-center space-x-2">
+                    <span class="lucide" data-lucide="clock"></span><span>Rush Hour</span>
+                </button>
+                <button id="road-closure" class="w-1/2 bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 transition flex items-center justify-center space-x-2">
+                    <span class="lucide" data-lucide="x"></span><span>Road Closure</span>
+                </button>
+            </div>
+            <div class="mb-6 flex space-x-3">
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="show-closed" class="accent-blue-600">
+                    <span class="text-sm text-gray-700">Show Closed Roads</span>
+                </label>
+                <label class="flex items-center space-x-2">
+                    <input type="checkbox" id="show-alternate" class="accent-blue-600">
+                    <span class="text-sm text-gray-700">Show Alternate Paths</span>
+                </label>
+            </div>
+            <button onclick="findRoute()" class="w-full bg-green-600 text-white p-2 rounded-lg hover:bg-green-700 transition flex items-center justify-center space-x-2">
+                <span class="lucide" data-lucide="navigation"></span><span>Find Optimal Route</span>
+            </button>
+            <button onclick="resetGraph()" class="w-full mt-3 bg-gray-500 text-white p-2 rounded-lg hover:bg-gray-600 transition flex items-center justify-center space-x-2">
+                <span class="lucide" data-lucide="rotate-ccw"></span><span>Reset</span>
+            </button>
+        </aside>
+
+        <main class="w-full lg:w-2/3 glass-card p-6 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-semibold mb-6 flex items-center space-x-2 text-gray-800">
+                <span class="lucide" data-lucide="map"></span><span>Route Visualization</span>
+            </h2>
+            <div id="canvas-container" class="w-full h-[500px] relative">
+                <div id="loading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-80">
+                    <span class="lucide" data-lucide="loader-2"></span>
+                </div>
+            </div>
+            <div id="output" class="mt-6 p-4 rounded-lg"></div>
+            <div id="log-panel" class="mt-4 p-3 bg-gray-100 rounded-lg text-sm"></div>
+        </main>
+    </div>
+
+    <div id="toast" class="fixed bottom-6 right-6 bg-green-600 text-white p-3 rounded-lg shadow-lg opacity-0 transform transition-all duration-300">
+        Action completed!
+    </div>
+
+    <!-- <div id="help-modal" class="modal fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-xl shadow-2xl max-w-xl w-full">
+            <h2 class="text-2xl font-semibold mb-4 text-gray-800">Help & Guide</h2>
+            <p class="text-sm mb-4 text-gray-700 leading-relaxed">
+                <strong>Graph Setup:</strong> Select a graph complexity or enter custom graph data (vertices V, edges E, edge details: src dest weight road_type, and coordinates x y).<br />
+                <strong>Controls:</strong> Use dropdowns or click nodes to set source/destination, adjust traffic, and toggle features.<br />
+                <strong>Navigation:</strong> Drag to pan, scroll to zoom the canvas.<br />
+                <strong>Color Codes:</strong> Green = smooth, Yellow = moderate, Red = high traffic; Gray = closed roads.<br />
+                <strong>Sample Input:</strong><br />
+                <code>5 6<br />0 1 5 arterial<br />1 2 10 arterial<br />2 3 15 local<br />0 2 20 highway<br />1 4 8 arterial<br />4 3 7 arterial<br />100 100<br />300 150<br />500 200<br />200 400<br />400 350</code>
+            </p>
+            <button onclick="toggleHelpModal()" class="w-full bg-red-600 text-white p-2 rounded-lg hover:bg-red-700 transition">Close</button>
+        </div>
+    </div> -->
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+        });
+
+        class Graph {
+            constructor(vertices) {
+                this.V = vertices;
+                this.adj = Array(vertices).fill().map(() => []);
+                this.nodes = Array(vertices).fill().map((_, i) => ({ id: i, x: 0, y: 0, label: `Node ${i}` }));
+            }
+            addEdge(src, dest, weight, road_type) {
+                this.adj[src].push({ dest, weight, road_type });
+                this.adj[dest].push({ dest: src, weight, road_type });
+            }
+            setNodeCoordinates(id, x, y, label) {
+                this.nodes[id] = { id, x, y, label };
+            }
+        }
+
+        let graph = null, path = [], dist = [], ambulancePos = 0, animationRunning = false, isDarkMode = false;
+        let cameraOffset = { x: 0, y: 0 }, cameraZoom = 1, isDragging = false, startDragOffset = { x: 0, y: 0 };
+
+        class PriorityQueue {
+            constructor() { this.values = []; }
+            enqueue(val) { this.values.push(val); this.values.sort((a, b) => a[0] - b[0]); }
+            dequeue() { return this.values.shift(); }
+            isEmpty() { return this.values.length === 0; }
+        }
+
+        function dijkstra(g, src, dest) {
+            try {
+                dist = Array(g.V).fill(Infinity);
+                let parent = Array(g.V).fill(-1);
+                let pq = new PriorityQueue();
+                dist[src] = 0;
+                pq.enqueue([0, src]);
+
+                while (!pq.isEmpty()) {
+                    let [d, u] = pq.dequeue();
+                    if (u === dest) break;
+                    if (d > dist[u]) continue;
+
+                    for (let e of g.adj[u]) {
+                        let v = e.dest, weight = e.weight;
+                        if (dist[u] + weight < dist[v]) {
+                            dist[v] = dist[u] + weight;
+                            parent[v] = u;
+                            pq.enqueue([dist[v], v]);
+                        }
+                    }
+                }
+
+                path = [];
+                if (dist[dest] === Infinity) {
+                    showToast('No path exists!', 'bg-red-600');
+                    document.getElementById('output').innerText = 'No path exists';
+                    return;
+                }
+
+                for (let v = dest; v !== -1; v = parent[v]) path.push(v);
+                path.reverse();
+
+                let output = `Fastest Route: ${path.map(id => graph.nodes[id].label).join(' → ')}\n`;
+                output += `Distance: ${dist[dest].toFixed(2)} km\n`;
+                output += `Estimated Time: ${dist[dest].toFixed(2)} min`;
+                document.getElementById('output').innerText = output;
+                logEvent(`Route Calculated: ${path.length} nodes`);
+                ambulancePos = 0;
+                animationRunning = true;
+                showToast('Route found!');
+                document.getElementById('loading').style.display = 'none';
+            } catch (e) {
+                showToast('Error: ' + e.message, 'bg-red-600');
+            }
+        }
+
+        const predefinedGraphs = {
+            easy: `5 6
+0 1 5 arterial
+1 2 10 arterial
+2 3 15 local
+0 2 20 highway
+1 4 8 arterial
+4 3 7 arterial
+100 100
+300 150
+500 200
+200 400
+400 350`,
+            moderate: `8 10
+0 1 5 arterial
+1 2 10 arterial
+2 3 15 local
+0 2 20 highway
+1 4 8 arterial
+4 3 7 arterial
+3 5 12 local
+5 6 10 arterial
+6 7 8 highway
+4 7 15 arterial
+150 100
+350 150
+550 200
+250 400
+450 350
+600 300
+300 500
+100 400`,
+            complex: `12 18
+0 1 5 arterial
+1 2 10 arterial
+2 3 15 local
+0 2 20 highway
+1 4 8 arterial
+4 3 7 arterial
+3 5 12 local
+5 6 10 arterial
+6 7 8 highway
+4 7 15 arterial
+7 8 10 local
+8 9 12 arterial
+9 10 8 highway
+10 11 15 local
+2 8 20 arterial
+5 9 18 local
+6 10 14 arterial
+0 11 25 highway
+100 100
+300 150
+500 200
+200 400
+400 350
+600 300
+300 500
+100 400
+500 500
+200 600
+400 550
+100 300`
+        };
+
+        function loadGraph() {
+            try {
+                const complexity = document.getElementById('graph-complexity').value;
+                let input;
+                if (complexity === 'custom') {
+                    input = document.getElementById('graph-input').value.trim().split('\n');
+                } else {
+                    input = predefinedGraphs[complexity].split('\n');
+                    document.getElementById('graph-input').value = predefinedGraphs[complexity];
+                }
+                const [V, E] = input[0].split(' ').map(Number);
+                graph = new Graph(V);
+
+                for (let i = 1; i <= E; i++) {
+                    const [src, dest, weight, road_type] = input[i].split(' ');
+                    graph.addEdge(parseInt(src), parseInt(dest), parseFloat(weight), road_type || 'arterial');
+                }
+
+                const labels = ['City Hospital', 'Main Square', 'Downtown', 'Emergency Center', 'Bypass Junction', 'North Hub', 'South Plaza', 'East Gate', 'West Market', 'Central Park', 'Old Town', 'River Bridge'];
+                for (let i = E + 1; i <= E + V; i++) {
+                    const [x, y] = input[i].split(' ').map(Number);
+                    graph.setNodeCoordinates(i - E - 1, x, y, labels[i - E - 1] || `Node ${i - E - 1}`);
+                }
+
+                updateCanvasSize();
+                updateNodeDropdowns();
+                path = [];
+                animationRunning = false;
+                logEvent('Graph Loaded');
+                showToast('Graph loaded successfully!');
+            } catch (e) {
+                showToast('Error loading graph: ' + e.message, 'bg-red-600');
+            }
+        }
+
+        function updateCanvasSize() {
+            if (!graph) return;
+            let maxX = 600, maxY = 500;
+            graph.nodes.forEach(node => {
+                maxX = Math.max(maxX, node.x + 100);
+                maxY = Math.max(maxY, node.y + 100);
+            });
+            resizeCanvas(maxX, maxY);
+            document.getElementById('canvas-container').style.width = '100%';
+            document.getElementById('canvas-container').style.height = '500px';
+        }
+
+        function updateNodeDropdowns() {
+            const sourceSelect = document.getElementById('source-node');
+            const destSelect = document.getElementById('dest-node');
+            sourceSelect.innerHTML = destSelect.innerHTML = '';
+            if (graph) {
+                graph.nodes.forEach(node => {
+                    const option1 = new Option(node.label, node.id);
+                    const option2 = new Option(node.label, node.id);
+                    sourceSelect.add(option1);
+                    destSelect.add(option2);
+                });
+            }
+            sourceSelect.value = '0';
+            destSelect.value = graph ? (graph.V - 1).toString() : '3';
+        }
+
+        function saveGraph() {
+            if (!graph) return showToast('No graph to save!', 'bg-red-600');
+            localStorage.setItem('savedGraph', document.getElementById('graph-input').value);
+            logEvent('Graph Saved');
+            showToast('Graph saved successfully!');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('rush-hour').addEventListener('click', () => {
+                if (!graph) return showToast('Load a graph first!', 'bg-red-600');
+                const factor = parseFloat(document.getElementById('traffic-slider').value) * 1.5;
+                for (let u = 0; u < graph.V; u++) {
+                    for (let e of graph.adj[u]) {
+                        if (e.road_type !== 'highway') e.weight *= factor;
+                    }
+                }
+                path = [];
+                animationRunning = false;
+                logEvent('Rush Hour Simulated');
+                showToast('Rush hour activated!');
+            });
+
+            document.getElementById('road-closure').addEventListener('click', () => {
+                if (!graph) return showToast('Load a graph first!', 'bg-red-600');
+                const u = Math.floor(Math.random() * graph.V);
+                const edge = graph.adj[u][Math.floor(Math.random() * graph.adj[u].length)];
+                if (edge) {
+                    edge.weight = Infinity;
+                    graph.adj[edge.dest].find(e => e.dest === u).weight = Infinity;
+                    path = [];
+                    animationRunning = false;
+                    logEvent(`Road Closed: ${graph.nodes[u].label} → ${graph.nodes[edge.dest].label}`);
+                    showToast('Road closed!');
+                }
+            });
+
+            document.getElementById('traffic-slider').addEventListener('input', (e) => {
+                document.getElementById('traffic-value').textContent = `${e.target.value}x`;
+            });
+
+            document.getElementById('theme-toggle').addEventListener('click', () => {
+                isDarkMode = !isDarkMode;
+                document.body.classList.toggle('dark', isDarkMode);
+                const icon = document.querySelector('#theme-toggle .lucide');
+                icon.setAttribute('data-lucide', isDarkMode ? 'sun' : 'moon');
+                lucide.createIcons();
+                showToast(`Switched to ${isDarkMode ? 'Dark' : 'Light'} Mode!`);
+            });
+
+            document.getElementById('graph-complexity').addEventListener('change', loadGraph);
+        });
+
+        function resetGraph() {
+            document.getElementById('graph-complexity').value = 'easy';
+            document.getElementById('graph-input').value = predefinedGraphs.easy;
+            loadGraph();
+            document.getElementById('traffic-slider').value = '1';
+            document.getElementById('traffic-value').innerText = '1.0x';
+            cameraOffset = { x: 0, y: 0 };
+            cameraZoom = 1;
+            logEvent('Graph Reset');
+            showToast('Graph reset!');
+        }
+
+        function findRoute() {
+            if (!graph) return showToast('Load a graph first!', 'bg-red-600');
+            const src = parseInt(document.getElementById('source-node').value);
+            const dest = parseInt(document.getElementById('dest-node').value);
+            if (isNaN(src) || isNaN(dest) || src < 0 || src >= graph.V || dest < 0 || dest >= graph.V) {
+                showToast('Invalid nodes!', 'bg-red-600');
+                return;
+            }
+            document.getElementById('loading').style.display = 'flex';
+            setTimeout(() => dijkstra(graph, src, dest), 300);
+        }
+
+        function showToast(message, bg = 'bg-green-600') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `fixed bottom-6 right-6 ${bg} text-white p-3 rounded-lg shadow-lg opacity-100 transform translate-y-0`;
+            setTimeout(() => toast.className += ' translate-y-10 opacity-0', 3000);
+        }
+
+        function logEvent(message) {
+            const logPanel = document.getElementById('log-panel');
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+            logPanel.innerHTML = `<div>${time} - ${message}</div>` + logPanel.innerHTML;
+            if (logPanel.children.length > 5) logPanel.removeChild(logPanel.lastChild);
+        }
+
+        function toggleHelpModal() {
+            const modal = document.getElementById('help-modal');
+            modal.classList.toggle('show');
+        }
+
+        function setup() {
+            let canvas = createCanvas(600, 500);
+            canvas.parent('canvas-container');
+            canvas.mousePressed(startDragging);
+            canvas.mouseReleased(stopDragging);
+            canvas.mouseWheel(zoomCanvas);
+            canvas.mouseClicked(handleCanvasClick);
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function startDragging() {
+            isDragging = true;
+            startDragOffset.x = mouseX / cameraZoom - cameraOffset.x;
+            startDragOffset.y = mouseY / cameraZoom - cameraOffset.y;
+        }
+
+        function stopDragging() {
+            isDragging = false;
+        }
+
+        function zoomCanvas(event) {
+            event.preventDefault();
+            const zoomSpeed = 0.1;
+            let oldZoom = cameraZoom;
+            cameraZoom += event.deltaY * -0.001 * zoomSpeed;
+            cameraZoom = constrain(cameraZoom, 0.5, 2);
+            cameraOffset.x = mouseX / cameraZoom - (mouseX / oldZoom - cameraOffset.x);
+            cameraOffset.y = mouseY / cameraZoom - (mouseY / oldZoom - cameraOffset.y);
+        }
+
+        function handleCanvasClick() {
+            if (!graph) return;
+            for (let node of graph.nodes) {
+                let adjustedX = (node.x + cameraOffset.x) * cameraZoom;
+                let adjustedY = (node.y + cameraOffset.y) * cameraZoom;
+                let d = dist(mouseX, mouseY, adjustedX, adjustedY);
+                if (d < 20 / cameraZoom) {
+                    if (!document.getElementById('source-node').dataset.selected) {
+                        document.getElementById('source-node').value = node.id;
+                        document.getElementById('source-node').dataset.selected = 'true';
+                        showToast(`Source: ${node.label}`);
+                    } else {
+                        document.getElementById('dest-node').value = node.id;
+                        document.getElementById('source-node').dataset.selected = '';
+                        findRoute();
+                        showToast(`Destination: ${node.label}`);
+                    }
+                    break;
+                }
+            }
+        }
+
+        function draw() {
+            background(240, 248, 255);
+            if (!graph) return;
+
+            push();
+            translate(cameraOffset.x * cameraZoom, cameraOffset.y * cameraZoom);
+            scale(cameraZoom);
+
+            if (isDragging) {
+                cameraOffset.x = mouseX / cameraZoom - startDragOffset.x;
+                cameraOffset.y = mouseY / cameraZoom - startDragOffset.y;
+            }
+
+            for (let u = 0; u < graph.V; u++) {
+                for (let e of graph.adj[u]) {
+                    if (e.dest > u) continue;
+                    let weight = e.weight * parseFloat(document.getElementById('traffic-slider').value);
+                    let color = weight > 15 ? '#ef4444' : weight > 10 ? '#f59e0b' : '#22c55e';
+                    let thickness = map(weight, 5, 20, 2, 5, true);
+                    stroke(color);
+                    strokeWeight(thickness / cameraZoom);
+                    line(graph.nodes[u].x, graph.nodes[u].y, graph.nodes[e.dest].x, graph.nodes[e.dest].y);
+                    if (e.weight === Infinity && document.getElementById('show-closed').checked) {
+                        stroke('#9ca3af');
+                        strokeWeight(2 / cameraZoom);
+                        line(graph.nodes[u].x, graph.nodes[u].y, graph.nodes[e.dest].x, graph.nodes[e.dest].y);
+                    }
+                }
+            }
+
+            if (path.length > 1) {
+                noFill();
+                stroke('#22c55e');
+                strokeWeight(4 / cameraZoom);
+                for (let i = 1; i < path.length; i++) {
+                    let u = path[i-1], v = path[i];
+                    drawingContext.setLineDash([5 / cameraZoom, 5 / cameraZoom]);
+                    line(graph.nodes[u].x, graph.nodes[u].y, graph.nodes[v].x, graph.nodes[v].y);
+                    drawingContext.setLineDash([]);
+                }
+
+                if (animationRunning) {
+                    let t = (frameCount % 150) / 150;
+                    let segment = Math.floor(ambulancePos);
+                    if (segment < path.length - 1) {
+                        let u = path[segment], v = path[segment + 1];
+                        let x = lerp(graph.nodes[u].x, graph.nodes[v].x, t);
+                        let y = lerp(graph.nodes[u].y, graph.nodes[v].y, t);
+                        fill('#ef4444');
+                        noStroke();
+                        ellipse(x, y, 20 / cameraZoom, 20 / cameraZoom);
+                        ambulancePos += 0.006;
+                        if (ambulancePos >= path.length - 1) animationRunning = false;
+                    }
+                }
+            }
+
+            for (let n of graph.nodes) {
+                noStroke();
+                fill(mouseX > (n.x + cameraOffset.x) * cameraZoom - 15 && mouseX < (n.x + cameraOffset.x) * cameraZoom + 15 && 
+                    mouseY > (n.y + cameraOffset.y) * cameraZoom - 15 && mouseY < (n.y + cameraOffset.y) * cameraZoom + 15 ? '#60a5fa' : '#3b82f6');
+                ellipse(n.x, n.y, 20 / cameraZoom, 20 / cameraZoom);
+                fill('#1e293b');
+                textSize(14 / cameraZoom);
+                textAlign(CENTER);
+                text(n.label, n.x, n.y - 25 / cameraZoom);
+            }
+            pop();
+        }
+
+        window.onload = () => {
+            document.getElementById('graph-complexity').value = 'easy';
+            document.getElementById('graph-input').value = predefinedGraphs.easy;
+            if (localStorage.getItem('savedGraph')) {
+                document.getElementById('graph-complexity').value = 'custom';
+                document.getElementById('graph-input').value = localStorage.getItem('savedGraph');
+            }
+            loadGraph();
+        };
+    </script>
+</body>
+</html>
